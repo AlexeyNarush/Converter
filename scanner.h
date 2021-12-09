@@ -22,6 +22,7 @@
 #define RETURN 22
 #define THEN 23
 #define WHILE 24
+#define WRITE 25
 
 //operatory inkrementace a dekrementace
 #define ASSIGNED 29 // '='
@@ -51,10 +52,9 @@
 
 //specialni znaky
 #define END_OF_FILE 60
-#define END_OF_LINE 61
 
 //chybove hlasky
-#define LEX_ERROR 1
+#define LEX_ERROR -10
 #define FILE_ERROR -1
 
 #define STR_LEN_INC 8
@@ -80,12 +80,15 @@ typedef struct inputFunc
     char *name;
     int type;
     struct inputFunc *next;
+    struct inputFunc *first;
 } * inPar;
 
 typedef struct outputFunc
 {
     int type;
+    bool nil;
     struct outputFunc *next;
+    struct outputFunc *first;
 } * outPar;
 
 typedef struct Func_tree
@@ -103,7 +106,8 @@ typedef struct Var_tree
 {
     int deepOfVar;
     char *name;
-    int type; // 16 : int, 22 : str, 19 : number
+    int type; 
+    bool nil;
     struct Var_tree *L;
     struct Var_tree *R;
     struct Var_tree *next;
@@ -130,20 +134,42 @@ typedef struct seznam
     struct seznam *first;
 } SeznamOfVars;
 
+typedef struct ifstruct {
+	int count;
+	struct ifstruct *previousElement;
+	struct ifstruct *nextElement;
+} *DLLElementPtr;
+
+typedef struct {
+	DLLElementPtr firstElement;
+	DLLElementPtr activeElement;
+	DLLElementPtr lastElement;
+} DLList;
+
 void setTable(symtable *st);
+
+void DLL_Init( DLList *list );
+void DLL_Dispose( DLList *list );
+void DLL_InsertLast( DLList *list);
+void DLL_Last( DLList *list );
+void DLL_SetValueEnd( DLList *list);
+void DLL_SetValueElse( DLList *list);
+void DLL_Previous( DLList *list);
+void DLL_Next( DLList *list );
+int DLL_GetValueCount( DLList *list);
 
 symtable *initST(symtable *ST);
 bool insertVar(vars *var_tree, int deep, char *name, int type);
 vars findVarFromTree(vars var_tree, int deep, char *name);
 vars findVar(vars var_tree, int deep, char *name);
-void freeVarTree(vars var);
-void freeAllVars(vars var);
-void insertFunc(char *name, funcs *func, int orig);
+vars freeVarTree(vars var);
+vars freeAllVars(vars var);
+funcs insertFunc(char *name, funcs *func, int orig);
 funcs findFunc(funcs func_tree, char *name);
 void insertInput(char *name_arg, funcs func, char *name_func, int type);
 void insertOutput(funcs func, int type, char *name);
 void freeFunc(funcs func);
-void insertInbuiltFuncs(funcs func);
+funcs insertInbuiltFuncs(funcs func);
 
 int strInit(string *s);
 void strFree(string *s);
@@ -160,4 +186,21 @@ int strGetLength(string *s);
 //hlavicka funkce simulujici lexikalni analyzator
 void setSourceFile(FILE *f);
 int getNextToken(string *attr);
-int express(int token, string *attr, vars var, funcs funcs, int deep);
+int express(char *funcname, int token, string *attr, vars var, funcs funcs, int deep, SeznamOfVars *seznam, int type, DLList *i, DLList *w);
+void changeError(int n);
+
+void GEN_WRITE_VAR_LITERAL(int token, char *attr);
+void GEN_FUNC_MAIN_END(char *name_func, int token);
+void GEN_FUNC_MAIN_START(char *name);
+void GEN_PRINT_WRITE(int token, string attr, vars vartree, int deep);
+void GEN_START_OF_FUNCTION(char* attr, int num, funcs f, SeznamOfVars *seznam, bool mainWas);
+void GEN_FUNC_CALL(char *name, SeznamOfVars *param, funcs func_tree);
+void GEN_END_OF_FUNCTION(string attr);
+void GEN_CALL_INBUILDS();
+void GEN_DEFVAR_VAR(SeznamOfVars *param);
+void GEN_MAIN_GLOBAL(char *str, int token);
+bool ifSpotted(int spotted);
+bool whileSpotted(int spotted);
+bool checkSEEN(int token);
+int ifORwhileWasTheLast(int c);
+void EXPRESSION_FUNC(char *attr, int token, bool end, char *var_name, DLList *l, DLList *w, vars vartree, int deep);

@@ -1,15 +1,29 @@
+/**
+ * @file main.c
+ * 
+ * @brief Implementation of binary search tree
+ * 
+ * IFJ Projekt 2021, Tým 133
+ * 
+ * @author <xkravc02> Kravchuk Marina
+*/
+
+
 #include "scanner.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 symtable *ST;
+struct inputFunc *start;
+struct outputFunc *startOut;
 
 symtable *initST(symtable *ST)
 {
 
     ST = malloc(sizeof(struct Symtable));
     if(ST == NULL){
+        changeError(99);
         return ST;
     }
     ST->func_tree = NULL;
@@ -23,19 +37,18 @@ symtable *initST(symtable *ST)
 bool insertVar(vars *var_tree, int deep, char *name, int type)     /// insert(&(ST->var_tree),...)
 {
     if(*var_tree == NULL){
-
         *var_tree = malloc(sizeof(struct Var_tree));
         if(*var_tree == NULL){
-            printf("net pameti\n");
+            changeError(99);
             return false;
         }
-
         (*var_tree)->name = name;
         (*var_tree)->deepOfVar = deep;
         (*var_tree)->L = NULL;
         (*var_tree)->R = NULL;
         (*var_tree)->next = NULL;
-        (*var_tree)->type = type;  
+        (*var_tree)->type = type;
+        (*var_tree)->nil = true;
         return true;
     }
     else if ((*var_tree != NULL)&&(deep > (*var_tree)->deepOfVar))
@@ -43,16 +56,21 @@ bool insertVar(vars *var_tree, int deep, char *name, int type)     /// insert(&(
         vars tmp = malloc(sizeof(struct Var_tree));
         if (tmp == NULL)
         {
+            changeError(99);
             return false;
         }
-        
-        tmp->name = name;
-        tmp->deepOfVar = deep;
-        tmp->L = NULL;
-        tmp->R = NULL;
-        tmp->next = (*var_tree);
-        tmp->type = type; 
-        *var_tree = tmp;
+        tmp->deepOfVar = (*var_tree)->deepOfVar;
+        tmp->name = (*var_tree)->name;
+        tmp->L = (*var_tree)->L;
+        tmp->R = (*var_tree)->R;
+        tmp->next = NULL;
+        tmp->type = (*var_tree)->type;
+        (*var_tree)->name = name;
+        (*var_tree)->deepOfVar = deep;
+        (*var_tree)->L = NULL;
+        (*var_tree)->R = NULL;
+        (*var_tree)->next = tmp;
+        (*var_tree)->type = type;
         return true;
     }
     else if (strcmp(name, (*var_tree)->name) < 0)
@@ -64,33 +82,19 @@ bool insertVar(vars *var_tree, int deep, char *name, int type)     /// insert(&(
         insertVar(&((*var_tree)->R), deep, name, type);
     }
     else{
-        printf("yze est'\n");
         return false;
     }
-    /*
-       ret = strcmp(str1, str2);
-
-   if(ret < 0) {
-      printf("str1 is less than str2");
-   } else if(ret > 0) {
-      printf("str2 is less than str1");
-   } else {
-      printf("str1 is equal to str2");
-   }    */
-    
 }
 
 vars findVarFromTree(vars var_tree, int deep, char *name)
 {
     if (var_tree == NULL)
     {
-        printf("VARTREE == NULL\n");
         return NULL;
     }
     
     if (strcmp(name, var_tree->name) == 0)
     {
-        printf("nasel %s %d\n", var_tree->name, var_tree->deepOfVar);
         return var_tree;
     }
     else if (strcmp(name, var_tree->name) < 0)
@@ -108,8 +112,7 @@ vars findVar(vars var_tree, int deep, char *name)
     vars tmp = var_tree;
     if (var_tree != NULL)
     {
-        printf("\\\\\\%d\n", var_tree->deepOfVar);
-        if (deep <= var_tree->deepOfVar)
+        if (deep >= var_tree->deepOfVar)
         {
             tmp = findVarFromTree(tmp, deep, name);
             if (tmp == NULL && deep > 0)
@@ -123,51 +126,54 @@ vars findVar(vars var_tree, int deep, char *name)
         }
         else
         {
-            printf("VARno\n");
             return NULL;
         }    
     }
     else
     {
-        printf("VARno\n");
         return NULL;
     }    
     
 }
 
-void freeVarTree(vars var)
+vars freeVarTree(vars var)
 {
     if (var == NULL)
     {
-        return;
+        return var;
     }
-    vars tmp = var->next;
-    freeVarTree(var->L);
-    freeVarTree(var->R);
-    free(var);
-    var = tmp;
-    return;
-    
+    vars tmp = var;
+    var = tmp->next;
+    if(tmp->L != NULL){
+        freeVarTree(tmp->L);
+    }
+    if(tmp->R != NULL){
+        freeVarTree(tmp->R);
+    }
+    tmp = NULL;
+    free(tmp);
+    return var; 
 }
 
-void freeAllVars(vars var)
+vars freeAllVars(vars var)
 {
     while (var != NULL)
     {
-        freeVarTree(var);
+        var = freeVarTree(var);
     }
-    
+    return var;
 }
 ////-------------------------------------FUNCTION-----------------------------------------/////
 
-void insertFunc(char *name, funcs *func, int orig)
+funcs insertFunc(char *name, funcs *func, int orig)
 {
     if (*func == NULL)
     {
         *func = malloc(sizeof(struct Func_tree));
         if (*func == NULL)
         {
-            return;
+            changeError(99);
+            return NULL;
         }
         (*func)->origin = orig;
         (*func)->name = name;
@@ -175,8 +181,7 @@ void insertFunc(char *name, funcs *func, int orig)
         (*func)->R = NULL;
         (*func)->in = NULL;
         (*func)->out = NULL;
-        printf("dobavil %s\n", (*func)->name);
-        return;
+        return (*func);
     }
     else if (strcmp((*func)->name, name) < 0)
     {
@@ -186,17 +191,12 @@ void insertFunc(char *name, funcs *func, int orig)
     {
         insertFunc(name, &((*func)->R), orig);
     }
-    else
-        printf("chyba\n");
-    
 }
 
 funcs findFunc(funcs func_tree, char *name)              //find(sym->func_tree, name)
 {
     if (func_tree != NULL)
     {
-        printf("%s  BO\n", name);
-        printf("--------------functree %s\n", func_tree->name);
         if (strcmp(func_tree->name, name) < 0)
         {
             findFunc(func_tree->L, name);
@@ -207,14 +207,12 @@ funcs findFunc(funcs func_tree, char *name)              //find(sym->func_tree, 
         }
         else if (strcmp(func_tree->name, name) == 0)
         {
-            printf("nasel func\n");
             return func_tree;
         }
     }
-    else{
-        printf("FUNCno\n"); 
+    else{ 
+        return NULL;
     }
-    return NULL;
     
 }
 
@@ -225,7 +223,6 @@ void insertInput(char *name_arg, funcs func, char *name_func, int type)
     {
         return;
     }
-
     if (function->in == NULL)
     {
         function->in = malloc(sizeof(struct inputFunc));
@@ -236,15 +233,15 @@ void insertInput(char *name_arg, funcs func, char *name_func, int type)
         function->in->name = name_arg;
         function->in->next = NULL;
         function->in->type = type;
+        start = function->in;
+        function->in->first = start;
         return;
     }
-
     inPar new_param = function->in;
     while (new_param->next != NULL)
     {
         new_param = new_param->next;
     }
-
     new_param->next = malloc(sizeof(struct inputFunc));
     if (new_param->next == NULL)
     {
@@ -254,6 +251,7 @@ void insertInput(char *name_arg, funcs func, char *name_func, int type)
     new_param->name = name_arg;
     new_param->next = NULL;
     new_param->type = type;
+    new_param->first = start;
 }
 
 void insertOutput(funcs func, int type, char *name)
@@ -261,6 +259,7 @@ void insertOutput(funcs func, int type, char *name)
     funcs function = findFunc(func, name);
     if (function == NULL)
     {
+        changeError(99);
         return;
     }
     if (function->out == NULL)
@@ -270,36 +269,48 @@ void insertOutput(funcs func, int type, char *name)
         {
             return;
         }
-        
+        function->out->nil = false;
         function->out->next = NULL;
         function->out->type = type;
+        startOut = function->out;
+        function->out->first = startOut;
         return;
     }
-    else
+    outPar new_param = function->out;
+    while (new_param->next != NULL)
     {
-        outPar new_param = function->out;
-        while (new_param->next != NULL)
-        {
-            new_param = new_param->next;
-        }
-        
-        new_param->next = malloc(sizeof(struct outputFunc));
         new_param = new_param->next;
-        new_param->next = NULL;
-        new_param->type = type;
+    }
+    new_param->next = malloc(sizeof(struct outputFunc));
+    new_param = new_param->next;
+    new_param->next = NULL;
+    new_param->nil = false;
+    new_param->type = type;
+    new_param->first = startOut;
+    if(new_param->first->next == NULL){
+        new_param->first->next = new_param; 
     }
     
+    return;
 }
 
 void freeFunc (funcs func)
 {
+    static bool orig = false;
     if (func == NULL)
     {
         return;
     }
-    freeFunc(func->L);
-    freeFunc(func->R);
+    if(func->origin == 1){
+        func->origin = 2;
+        orig = true;
+    }
     inPar tmp = func->in;
+    if(func->in != NULL){
+        if(func->in->first != NULL){
+            tmp = func->in->first;
+        }
+    }
     while(tmp != NULL)
     {
         inPar tmp2;
@@ -308,69 +319,58 @@ void freeFunc (funcs func)
         tmp = tmp2;
     }  
     outPar tmp3 = func->out;
-    while(tmp != NULL)
+    if(func->out != NULL){
+        if(func->out->first != NULL){
+            tmp3 = func->out->first;
+        }
+    }
+    while(tmp3 != NULL)
     {
         outPar tmp4;
         tmp4 = tmp3->next;
-        free(tmp);
+        free(tmp3);
         tmp3 = tmp4;
-    }   
-    
-    free(func);
+    }
+    if(func->L != NULL){
+        freeFunc(func->L);
+    }
+    if(func->R != NULL){
+        freeFunc(func->R);
+    }
+    if(orig){
+        changeError(15);
+    }
     func = NULL;
     return;
     
 }
 
-////--------------------------------------------------------------------------------------------------
-/*
-void insertInbuiltFuncs(funcs func)
+funcs insertInbuiltFuncs(funcs func)
 {
-    insertFunc("reads", &func);
-    insertOutput(func, 2, "reads");
-    insertFunc("readi", &func);
-    insertOutput(func, 1, "readi");
-    insertFunc("readn", &func);
-    insertOutput(func, 3, "reads");
+    insertFunc("reads", &func, 2);
+    insertOutput(func, STRING, "reads");
+    insertFunc("readi", &func, 2);
+    insertOutput(func, INTEGER, "readi");
+    insertFunc("readn", &func, 2);
+    insertOutput(func, NUMBER, "readn");
 
-    insertFunc("tointeger", &func);
-    insertInput("f", func, "tointeger", 3);
-    insertOutput(func, 1, "tointeger");
+    insertFunc("tointeger", &func, 2);
+    insertInput("f", func, "tointeger", NUMBER);
+    insertOutput(func, INTEGER, "tointeger");
 
-    insertFunc("substr", &func);
-    insertInput("s", func, "substr", 2);
-    insertInput("i", func, "substr", 3);
-    insertInput("j", func, "substr", 3);
-    insertOutput(func, 2, "substr");
+    insertFunc("substr", &func, 2);
+    insertInput("s", func, "substr", STRING);
+    insertInput("i", func, "substr", INTEGER);
+    insertInput("j", func, "substr", INTEGER);
+    insertOutput(func, STRING, "substr");
+
+    insertFunc("ord", &func, 2);
+    insertInput("s", func, "ord", STRING);
+    insertInput("i", func, "ord", INTEGER);
+    insertOutput(func, INTEGER, "ord");
+
+    insertFunc("chr", &func, 2);
+    insertInput("i", func, "chr", INTEGER);
+    insertOutput(func, STRING, "chr");
+    return func;
 }
-/*
-int main()
-{
-    
-    ST = init(ST);
-
-    insertVar(&(ST->var_tree), 0, "abc", 1);
-    insertVar(&(ST->var_tree), 0, "adsad", 1);
-    insertVar(&(ST->var_tree), 0, "ggghcff", 1);
-    insertVar(&(ST->var_tree), 1, "adsad", 1);
-    vars tmp = findVar(ST->var_tree, 0 , "ggghcff");
-    if (tmp->deepOfVar == 0)
-    {
-        printf("nasel\n\n");
-    }
-    
-
-    Token *token = malloc(sizeof(struct token));
-    token->data = "ahoj";
-    token->next = NULL;
-    token->size = 4;
-    token->type = 10;
-
-    insertFunc(token->data, &(ST->func_tree));
-    insertInput("as", ST->func_tree, "ahoj", 2);
-
-    freeFunc(ST->func_tree);
-    freeVarTree(ST->var_tree);
-    //free(ST->var_tree);
-    return 0;
-}*/
